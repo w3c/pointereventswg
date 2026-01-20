@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WPT.fyi snapshot</title>
+  <style>
+    body { margin: 3%;}
+    table { border-collapse: collapse; margin-top: 2ex;}
+    tbody th, tbody td { border: 1px solid black; padding: 0.5ex}
+    .noborder, tr.file th { border: none; padding: 0}
+
+    tbody th { text-align: left;}
+    tbody tr.harness th, tbody tr.overall th {
+      text-align: right;
+      font-style: italic;
+      border: none;
+    }
+    thead th, tr.file td { text-transform: capitalize}
+    thead th { min-width: 12ex;  font-variant: small-caps;}
+    tbody td { text-align: center;}
+    tr.file th { padding-top: 6ex; }
+    tr.file th a { text-decoration: none; }
+    tr.subtest th { text-align: left; font-weight: normal; font-family: monospace; padding-left: 2ex}
+    tr.subtest td { background-color: rgb(238, 238, 238);  color: rgb(51, 51, 51); }
+    tr.subtest td, tr.harness td { font-variant: small-caps; font-size: smaller; }
+    td.ERROR, tr.subtest td.sb_FAIL { background-color: rgb(229, 115, 115); color: rgb(51, 51, 51) }
+    tr.subtest td.sb_PASS { background-color: rgb(129, 199, 132); color: rgb(51, 51, 51)}
+    .warning {
+      background-color: yellow;
+      color: black !important;
+      padding: 1ex;
+      border: 1px solid black;
+      width: 80%;
+      text-align: center;
+      margin: auto;
+    }
+    </style>
+</head>
+<script class='remove'>
+// create an element easily
+// attrs is object (and optional)
+// content is Element or string
+function domElement(namespaceURI, name, attrs, ...content) {
+  const elt = document.createElementNS(namespaceURI, name);
+  if (attrs) {
+    if (attrs instanceof Element || typeof attrs === 'string') {
+      elt.append(attrs);
+    } else {
+      Object.entries(attrs).forEach(p => elt.setAttribute(p[0], p[1]));
+    }
+  }
+  content.forEach(c => elt.append(c));
+  return elt;
+}
+function htmlElement(name, attrs, ...content) {
+  return domElement("http://www.w3.org/1999/xhtml", name, attrs, ...content);
+}
+function svgElement(name, attrs, ...content) {
+  return domElement("http://www.w3.org/2000/svg", name, attrs, ...content);
+}
+</script>
+</head>
+<body>
+  <script class='remove'>
+
+const config = {
+  filter: "webauthn"
+};
+
+async function wptfyi() {
+  const { from, to, label = "experimental", maxCount = 1 } = config || {};
+  const fileSearch = `/${config.filter}/`;
+  const start_index = fileSearch.length;
+  let query = `?label=${label}&max-count=${maxCount}&aligned`;
+  if (from) {
+    query += `&from=${from.toISOString()}`
+  }
+  if (to) {
+    query += `&to=${to.toISOString()}`
+  }
+
+  const json_fetch = (url) => fetch(url).then(r => r.json()).catch(e => {
+    // console.log(`error in JSON for ${url}`);
+    return {};
+  }); // convenience
+
+  // get the runs based on the query
+  let runs = await json_fetch(`https://wpt.fyi/api/runs${query}`);
+  if (config.products) {
+    runs = runs.filter(r => config.products.includes(r.browser_name));
+  }
+  const results = (await json_fetch(`https://wpt.fyi/api/search?run_ids=${runs.map(run => run.id).join(',')}`))
+    .results.filter(r => r.test.indexOf(fileSearch) === 0);
+
+  let files = results.map(r => { return {
+    name: r.test,
+    pretty_name: r.test.substring(start_index)
+  }; });
+  const ps =  [];
+  runs.forEach((run, idx) => {
+    const url = run.results_url
+     .substring(0, run.results_url.indexOf("-summary_v2.json.gz"));
+    run.time_start = new Date(run.time_start);
+    run.time_end = new Date(run.time_end);
+    let sps = results.map(r =>
+      json_fetch(url + r.test).then(data => {
+        data.name = r.test.substring(start_index);
+        data.legacy_status = r.legacy_status[idx];
+        data.url = url;
+        return data;
+      }));
+    ps.push(Promise.all(sps).then(data => run.tests = data));
+  });
+  return Promise.all(ps).then(() => {
+    return { runs, files };
+  });
+}
+
+// format a Date, "Aug 21, 2019"
+function formatDate(date) {
+  // date is a date object
+  const options = { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' };
+  return date.toLocaleString('en-US', options);
+}
+
+async function run() {
+  const { runs, files } = await wptfyi();
+  document.body.append(
+    htmlElement("div", { class: "head" },
+      htmlElement("h1",
+      htmlElement("img", {src: "https://wpt.fyi/static/logo.svg",
+                        style: "width: 2ex; margin-bottom: -0.5ex",
+                        alt: "wpt.fyi logo"}),
+      ` web-platform-tests dashboard snapshot for /${config.filter}/`),
+      htmlElement("h3",
+        "As of ",
+        htmlElement("time",
+          { datetime: config.to.toISOString() },
+           formatDate(config.to))),
+      htmlElement("p", { class: "warning" },
+       "This is a snapshot of web-platform-tests results. It is not maintained "
+       + "and developers should refer to ",
+       htmlElement("a", { href: "https://wpt.fyi/" }, "wpt.fyi"),
+       " for the most current test results and other developments.")));
+
+  document.title = `<wpt.fyi>/${config.filter}/ snapshot`;
+
+  let hash = runs[0].full_revision_hash;
+
+  for (let index = 0; index < files.length; index++) {
+    const file = files[index];
+    file.runs = runs.map(r => r.tests[index]);
+    file.subtests = new Set();
+    file.runs.forEach(r => {
+      if (r.subtests) {
+        r.subtests.forEach( sb => file.subtests.add(sb.name) )
+      }
+    });
+  }
+
+  let subtests_count = files.reduce((a,v) => a + v.subtests.size, 0);
+
+  document.body.append(htmlElement("section",
+    htmlElement("h2", {id: "tests"}, "Tests"),
+    htmlElement("p", `${files.length} tests were found (${subtests_count} subtests) in /${config.filter}/.`
+    )));
+
+  document.body.append(htmlElement("section",
+    htmlElement("h2", {id: "implementations"}, "Implementations"),
+    htmlElement("ul",
+      ... runs.map(r => htmlElement("li",
+        `${r.browser_name}/${r.browser_version} - ${r.os_name}/${r.os_version} - `
+        + formatDate(r.time_end) + " - wpt/",
+        htmlElement("a", { href: `https://github.com/web-platform-tests/wpt/tree/${r.full_revision_hash}` },
+                     r.full_revision_hash.substring(0, 10))
+        )))));
+
+  let ths = runs.map(r => htmlElement("th", r.browser_name));
+
+  let table = htmlElement("table",
+    htmlElement("thead",
+      htmlElement("tr",
+        htmlElement("th", "file name"),
+        ... ths)
+    ));
+
+  files.forEach(file => {
+    const subtests_count = file.subtests.size;
+    let trs = [];
+    file.subtests.forEach(sname => {
+      const rows = file.runs.map(r => {
+        const sbs = (r.subtests)? r.subtests.filter(sb => sb.name === sname) : [];
+        return (sbs.length)? sbs[0].status : "missing";
+      })
+      let display_name = sname;
+      if (display_name.length > 110) {
+        // truncate subtest names
+        display_name = display_name.substring(0, 100) + "…";
+      }
+      trs.push(htmlElement("tr",
+        { class: "subtest" },
+        htmlElement("th", {"title": sname}, display_name),
+        ... rows.map(r =>
+        htmlElement("td", { class: `sb_${r}`}, r)
+       )));
+    })
+    let tbody = htmlElement("tbody",
+      htmlElement("tr", { class: "file" },
+        htmlElement("th",
+          htmlElement("a", { href:
+            `https://github.com/web-platform-tests/wpt/blob/${hash}${file.name}`
+          }, file.pretty_name )
+        )),
+      htmlElement("tr", { class: "overall" },
+        htmlElement("th", "Overall"),
+        ... file.runs.map(r =>
+          htmlElement("td", `${r.legacy_status.passes} / ${r.legacy_status.passes}`))),
+      htmlElement("tr", { class: "harness" },
+        htmlElement("th", "Harness status"),
+        ... file.runs.map(r =>
+          htmlElement("td", { class: r.status }, r.status))),
+      ... trs
+      );
+    table.append(tbody)
+  })
+  document.body.append(table);
+
+  let scripts = document.querySelectorAll("script[class=remove]");
+
+  scripts.forEach(script => {
+    script.parentNode.removeChild(script);
+  });
+}
+
+// parse the URL to update the config
+for (const [key, value] of (new URL(window.location)).searchParams) {
+  config[key] = value;
+}
+if (config.products) {
+  config.products = config.products.split(",");
+}
+if (config.date) {
+  // date=20200601
+  let match = config.date.match(/^([0-9]{4})([0-9]{2})([0-9]{2})/);
+  if (!match) {
+    // date=2020-06-01
+    match = config.date.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})/);
+  }
+  if (match) {
+    const oneday = 1000 * 60 * 60 * 24;
+    let d = new Date(`${match[1]}-${match[2]}-${match[3]}`);
+    config.from = new Date(d.getTime() - (oneday*14));
+    config.to = new Date(d.getTime() + oneday);
+  } else {
+    config.from = undefined;
+    config.to = undefined;
+  }
+}
+if (!config.to) {
+  config.to = new Date();
+}
+for (const [key, value] of Object.entries(config)) {
+  const elts = document.querySelectorAll(`*[data-key="config.${key}"]`);
+  elts.forEach(elt => elt.textContent = value);
+}
+
+
+run().catch(console.error);
+
+  </script>
+</body>
+</html>

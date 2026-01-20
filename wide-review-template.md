@@ -14,7 +14,7 @@ This is a meta issue to track [wide review](https://www.w3.org/guide/documentrev
 
 ## Horizontal groups
 
-An important part of wide review is horizontal review from W3C's [key horizontal groups](https://www.w3.org/Guide/documentreview/#how_to_get_horizontal_review) listed below.
+An important part of wide review is horizontal review from W3C's [key horizontal groups](https://www.w3.org/guide/documentreview/#how-to-get-horizontal-review) listed below.
 
 🟢 ♿ **Accessibility**
 
@@ -28,6 +28,7 @@ An important part of wide review is horizontal review from W3C's [key horizontal
 🟢 🗼 **Architecture**
 
 - [ ] Ask the [TAG](https://www.w3.org/2001/tag/) for review; see [how to work with the TAG](https://tag.w3.org/workmode/)
+- [] [request a review via GitHub](https://github.com/w3ctag/design-reviews/issues)
 - [ ] Address [tag-needs-resolution](https://github.com/w3c/pointerevents/labels/tag-needs-resolution) issues
 - [ ] Consider [tag-tracker](https://github.com/w3c/pointerevents/labels/tag-tracker) issues
 - [ ] TAG feedback integrated
@@ -65,7 +66,7 @@ An important part of wide review is horizontal review from W3C's [key horizontal
 
 ## Group Dependencies
 
-The [charter](https://www.w3.org/groups/wg/pointer-events/charters/active/) contains a list of dependency groups:
+The [charter](https://www.w3.org/groups/wg/pointer-events/charters/active/) contains a list of dependency groups. If you skip one of those, simply provide a rational.
 
 🟢 CSS Working Group: touch-action CSS property
 
