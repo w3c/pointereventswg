@@ -28,7 +28,7 @@ An important part of wide review is horizontal review from W3C's [key horizontal
 🟢 🗼 **Architecture**
 
 - [ ] Ask the [TAG](https://www.w3.org/2001/tag/) for review; see [how to work with the TAG](https://tag.w3.org/workmode/)
-- [] [request a review via GitHub](https://github.com/w3ctag/design-reviews/issues)
+- [ ] [request a review via GitHub](https://github.com/w3ctag/design-reviews/issues)
 - [ ] Address [tag-needs-resolution](https://github.com/w3c/pointerevents/labels/tag-needs-resolution) issues
 - [ ] Consider [tag-tracker](https://github.com/w3c/pointerevents/labels/tag-tracker) issues
 - [ ] TAG feedback integrated
